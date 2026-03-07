@@ -34,6 +34,11 @@ EDdf <- rbind(S1,S3, S4, S5, S7, S9, S10, S11)
 EDdf <- EDdf %>% mutate(across(where(is.character), as.factor))
 colnames(EDdf)
 
+write.csv(EDdf,
+          "C:/github/CBASS/AS-CBASS.2026/Data/EDsdf-all.csv",
+          row.names = FALSE)
+
+
 #long format for facet plotting
 ED_long <- EDdf %>%
   pivot_longer(
