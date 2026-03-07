@@ -45,7 +45,7 @@ models <- fit_drms(cbass_dataset, grouping_properties, drm_formula, is_curveid =
 #get-eds
 eds <- get_all_eds_by_grouping_property(models)
 View(eds)
-#eds$GroupingProperty[eds$GroupingProperty == "9_AABR"] <- "9_AABR_1" #manual fix for when there is only one replicate of a species in the run
+eds$GroupingProperty[eds$GroupingProperty == "1_AHYA"] <- "1_AHYA_1" #manual fix for when there is only one replicate of a species in the run
 
 cbass_dataset <- define_grouping_property(cbass_dataset, grouping_properties) %>%
   mutate(GroupingProperty = paste(GroupingProperty, Genotype, sep = "_"))
@@ -79,7 +79,7 @@ eds_boxplot <- eds_df %>% ggplot(
 
 eds_boxplot
 #update site name
-save_path <- file.path(output_plot, "Site-011_ED50.pdf")
+save_path <- file.path(output_plot, "Site-001_ED50.pdf")
 ggsave(save_path, eds_boxplot,  width = 16, height = 9, device = "pdf")
 
 
