@@ -1,9 +1,7 @@
 #Code for exploring how ED values vary depending on which temp data is included.
 
 #load packages
-library(dplyr)
-library(tidyr)
-library(ggplot2)
+library(tidyverse)
 library(readxl)
 library(rstudioapi)
 library(RColorBrewer)
@@ -24,121 +22,210 @@ S9 <- read_csv("Data/RAW_ESA-009_20260216_PAM.csv")
 S10 <- read_csv("Data/RAW_ESA-010_20260217_PAM.csv")
 S11 <- read_csv("Data/RAW_ESA-011_20260210_PAM.csv")
 
-dat <- rbind(S1,S3, S4, S5, S7, S9, S10, S11)
+dat <- bind_rows(S1,S3, S4, S5, S7, S9, S10, S11)
 dat <- dat %>% mutate(across(where(is.character), as.factor))
+dat$Site <- as.character(dat$Site)
+dat$Genotype <- as.character(dat$Genotype )
 colnames(dat)
 
-#Prep various data subset------------
-target_classic <- c(29,36,38,39)
-classic <- dat %>%
-  filter(Temperature %in% target_classic) %>%
-  group_by(Site) %>%
-  filter(all(target_classic %in% Temperature)) %>%
-  ungroup() %>%
-  select(-PAM1, -PAM2, -comments)%>%
-  droplevels()
-length(unique(classic$Site)) #confirmed 8
+#define ramp temp datasets------------------------
+temp_sets <- list(
+  Classic = c(29,36,38,39),
+  Refined = c(29,35,36,37,37.5,38,38.5,39),
+  Max_common = c(29,35,36,37,38,39),
+  All = sort(unique(dat$Temperature))
+)
 
-write.csv(classic, "Classic_review.csv")
-#need to figure out why ICRA from site 5, rep 11,13,14 is giving wonky ED50s; and AHYA from site 1
+#create function to process a ramp dataset
+process_cbass_dataset <- function(dat, temps, dataset_name){
+  
+  # subset ramp temps and ensure full ramp exists for each site
+  cbass_subset <- dat %>%
+    filter(Temperature %in% temps)
+  
+  # Only enforce full ramp for specific ramp designs
+  if(dataset_name != "All"){
+    cbass_subset <- cbass_subset %>%
+      group_by(Site) %>%
+      filter(all(temps %in% unique(Temperature))) %>%
+      ungroup()
+  }
+  
+  cbass_subset <- cbass_subset %>%
+    select(-PAM1, -PAM2, -comments)
+  
+  cbass_subset %>%
+    group_by(Site) %>%
+    summarise(n_temps = n_distinct(Temperature))
+  
+  # preprocess CBASS dataset
+  cbass_subset <- preprocess_dataset(cbass_subset)
+  validate_cbass_dataset(cbass_subset)
+  
+  # fit DRM models
+  grouping_properties <- c("Site","Species")
+  drm_formula <- "Pam_value ~ Temperature"
+  
+  models <- fit_drms(cbass_subset,
+                     grouping_properties,
+                     drm_formula,
+                     is_curveid = TRUE)
+  
+  # extract ED values
+  eds <- get_all_eds_by_grouping_property(models)
+  
+  # separate grouping property safely
+  eds <- eds %>%
+    separate(GroupingProperty,
+             into = c("Site","Species","Genotype"),
+             sep="_",
+             fill="right") %>%
+    mutate(Genotype = ifelse(is.na(Genotype),"1",Genotype))
+  
+  # keep relevant columns
+  eds_df <- eds %>%
+    select(ED5,ED50,ED95,Site,Species,Genotype) %>%
+    mutate(Dataset = dataset_name)
+  
+  return(eds_df)
+}
 
-target_refined <- c(29, 35, 36, 37, 37.5, 38, 38.5, 39)
-refined <- dat %>%
-  filter(Temperature %in% target_refined) %>%
-  group_by(Site) %>%
-  filter(all(target_refined %in% Temperature)) %>%
-  ungroup() %>%
-  select(-PAM1, -PAM2, -comments)%>%
-  droplevels()
-length(unique(refined$Site)) #confirmed 5
+#run fuction across all ramp designs
+eds_all <- bind_rows(lapply(names(temp_sets), function(name){
+    process_cbass_dataset(dat,
+                          temps = temp_sets[[name]],
+                          dataset_name = name)
+     })
+)
 
-
-target_max_common <- c(29, 35, 36, 37, 38, 39)
-max_common <- dat %>%
-  filter(Temperature %in% target_max_common) %>%
-  group_by(Site) %>%
-  filter(all(target_max_common %in% Temperature)) %>%
-  ungroup() %>%
-  select(-PAM1, -PAM2, -comments)%>%
-  droplevels()
-length(unique(max_common$Site)) #confirmed 8
-
-#####Load and Prep Data-----------------------------
-
-#rotate each of these
-cbass_dataset <- classic
-cbass_dataset <- refined
-cbass_dataset <- max_common
-
-#r process-and-validate-cbass-dataset
-cbass_dataset <- preprocess_dataset(cbass_dataset)
-validate_cbass_dataset(cbass_dataset)
-
-
-####Generate ED5s, ED50s, and ED95s---------------------
-#create models
-grouping_properties <- c("Site", "Species")
-drm_formula <- "Pam_value ~ Temperature"
-models <- fit_drms(cbass_dataset, grouping_properties, drm_formula, is_curveid = TRUE)
-
-#get-eds
-eds <- get_all_eds_by_grouping_property(models)
-View(eds)
-eds$GroupingProperty[eds$GroupingProperty == "1_AHYA"] <- "1_AHYA_1"
-eds$GroupingProperty[eds$GroupingProperty == "7_AHYA"] <- "7_AHYA_1"#manual fix for when there is only one replicate of a species in the run
-eds$GroupingProperty[eds$GroupingProperty == "9_AABR"] <- "9_AABR_1"
-
-cbass_dataset <- define_grouping_property(cbass_dataset, grouping_properties) %>%
-  mutate(GroupingProperty = paste(GroupingProperty, Genotype, sep = "_"))
-
-eds_df <- 
-  left_join(eds, cbass_dataset, by = "GroupingProperty") %>%
-  select(names(eds), all_of(grouping_properties)) %>%
-  distinct()
-
-head(eds_df)
-write.csv(eds_df,
-          "C:/github/CBASS/AS-CBASS.2026/Data/EDsdf-refined.csv",
+#save combined dataset
+write.csv(eds_all,
+          "Data/EDsdf_all_ramps.csv",
           row.names = FALSE)
 
+#explore for outliers (getting those odd values under the "classic" temp ramp)
+View(eds_all)
 
-#####Stats comparing EDs generated by each dataset-----------------
-library(lme4)
-library(lmerTest)
-library(emmeans)
-rm(list = ls())
+#run model comparing ED50 estimate among temp ramp designs------------------------------
 
-#load ED values for each dataset and merge
-classic <- read_csv("Data/EDsdf-classic.csv") %>% mutate(across(where(is.character), as.factor))
-refined <- read_csv("Data/EDsdf-refined.csv") %>% mutate(across(where(is.character), as.factor))
-max_common <- read_csv("Data/EDsdf-max_common.csv") %>% mutate(across(where(is.character), as.factor))
-all <- read_csv("Data/EDsdf-all.csv") %>% mutate(across(where(is.character), as.factor))
+eds_all2 <- eds_all%>% filter(Species %in% c("AGLO", "ICRA"))%>% 
+  filter(ED50 >= min(temp_sets$Classic) & ED50 <= max(temp_sets$Classic)) %>% #filter out the oddballs that are showing up in the classic ramps
+  droplevels()#limit to our two primary taxa with the largest N
 
-classic$Dataset <- as.factor("Classic")
-refined$Dataset <- as.factor("Refined")
-max_common$Dataset <- as.factor("Max_common")
-all$Dataset <-as.factor("All")
 
-#merge
-dat <- rbind(classic, refined, max_common, all)
-dat$Site <- as.factor(dat$Site)
-dat2 <- dat%>% filter(Species %in% c("AGLO", "ICRA"))%>% droplevels()#limit to our two primary taxa with the largest N
+site_means2 <- eds_all2 %>%
+  group_by(Site, Species, Dataset) %>%
+  summarise(ED50 = mean(ED50, na.rm = TRUE), .groups = "drop")
 
-m1 <- lmer(ED50 ~ Dataset + Species + (1|Site), data = dat2)
-isSingular(m1)
-VarCorr(m1)
-anova(m1)
-emmeans(m1, pairwise ~ Dataset)
 
-#site variance appears negligible
-m2 <- lm(ED50 ~ Dataset + Species, data = dat2)
-anova(m2)
-emmeans(m2, pairwise ~ Dataset)
+#linear model
+lm_site2 <- lm(ED50 ~ Dataset + Species, data = site_means2)
+anova(lm_site2)
 
-library(ggplot2)
 
-ggplot(dat2, aes(Dataset, ED50)) +
-  geom_boxplot() +
-  geom_jitter(width = 0.1, alpha = 0.5) +
-  facet_wrap(~Species) +
-  theme_classic()
+
+g1 <- ggplot(site_means2, aes(x = Dataset, y = ED50, fill = Species)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.35) +
+  geom_jitter(aes(color = Species),
+              width = 0.15,
+              alpha = 0.8,
+              size = 2,
+              show.legend = FALSE) +
+  facet_wrap(~ Species, scales = "fixed") +
+  theme_classic(base_size = 14) +
+  labs(
+    x = "Temp Ramp",
+    y = expression(paste("ED50 (", degree, "C)")),
+    title = "ED50 Comparisons Across Temp Ramps"
+  ) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  theme(legend.position = "none")
+
+g1
+
+
+ggsave(
+  filename = "ED50 Comparisons Across Temp Ramps.jpeg",   # file name
+  plot = g1,                                 # the plot object
+  path = "C:/github/CBASS/AS-CBASS.2026/Plots", # folder path
+  width = 10,                               # width in inches
+  height = 6,                               # height in inches
+  dpi = 300                                 # resolution
+)
+
+#run model comparing ED50 estimate from same sites calculated under classic vs refined model------------------------------
+
+shared_sites <- c(3,4,5,9,10)
+
+dat_shared <- eds_all2 %>%
+  filter(Site %in% shared_sites,
+         Dataset %in% c("Classic","Refined"),
+         Species %in% c("AGLO","ICRA"))
+
+site_means_shared <- dat_shared %>%
+  group_by(Site, Species, Dataset) %>%
+  summarise(ED50 = mean(ED50, na.rm = TRUE), .groups = "drop")
+
+#paired test using site as blocking factor
+lm_ramp <- lm(ED50 ~ Dataset * Species + Site, data = site_means_shared)
+anova(lm_ramp) #dataset still not significant
+
+
+#convert to a paired difference for even cleaner analysis
+#Is ramp bias different from zero?
+ramp_diff <- site_means_shared %>%
+  pivot_wider(names_from = Dataset, values_from = ED50) %>%
+  mutate(delta_ED50 = Refined - Classic)
+
+lm_delta <- lm(delta_ED50 ~ Species, data = ramp_diff)
+anova(lm_delta)
+
+ggplot(ramp_diff, aes(Species, delta_ED50)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point(aes(color = Site), size = 3) +
+  theme_classic() +
+  ylab("ΔED50 (Refined − Classic)")
+
+
+sd(ramp_diff$delta_ED50)
+
+sd(site_means$ED50) 
+#ramp bias is small relative to site variation,
+
+
+#plot
+g2 <- ggplot(site_means_shared, aes(x = Dataset, y = ED50, fill = Species)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.35) +
+  geom_jitter(aes(color = Species),
+              width = 0.15,
+              alpha = 0.8,
+              size = 2,
+              show.legend = FALSE) +
+  facet_wrap(~ Species, scales = "fixed") +
+  theme_classic(base_size = 14) +
+  labs(
+    x = "Temp Ramp",
+    y = expression(paste("ED50 (", degree, "C)")),
+    title = "ED50 Comparisons Across Temp Ramps",
+    subtitle = "Paired Sites"
+  ) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  theme(legend.position = "none")
+
+g2
+
+
+ggsave(
+  filename = "ED50 Comparisons Across Temp Ramps--paired sites.jpeg",   # file name
+  plot = g1,                                 # the plot object
+  path = "C:/github/CBASS/AS-CBASS.2026/Plots", # folder path
+  width = 10,                               # width in inches
+  height = 6,                               # height in inches
+  dpi = 300                                 # resolution
+)
