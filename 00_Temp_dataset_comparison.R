@@ -99,38 +99,31 @@ eds_all <- bind_rows(lapply(names(temp_sets), function(name){
 )
 
 #save combined dataset
-write.csv(eds_all,
-          "Data/EDsdf_all_ramps.csv",
-          row.names = FALSE)
+write.csv(eds_all,"Data/EDsdf_all_ramps.csv", row.names = FALSE)
+
+
+#run model comparing ED50 estimate among temp ramp designs------------------------------
 
 #explore for outliers (getting those odd values under the "classic" temp ramp)
 View(eds_all)
-
-#run model comparing ED50 estimate among temp ramp designs------------------------------
 
 eds_all2 <- eds_all%>% filter(Species %in% c("AGLO", "ICRA"))%>% 
   filter(ED50 >= min(temp_sets$Classic) & ED50 <= max(temp_sets$Classic)) %>% #filter out the oddballs that are showing up in the classic ramps
   droplevels()#limit to our two primary taxa with the largest N
 
-
+#summarize data at site level to avoid psuedoreplication
 site_means2 <- eds_all2 %>%
   group_by(Site, Species, Dataset) %>%
   summarise(ED50 = mean(ED50, na.rm = TRUE), .groups = "drop")
-
 
 #linear model
 lm_site2 <- lm(ED50 ~ Dataset + Species, data = site_means2)
 anova(lm_site2)
 
 
-
 g1 <- ggplot(site_means2, aes(x = Dataset, y = ED50, fill = Species)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.35) +
-  geom_jitter(aes(color = Species),
-              width = 0.15,
-              alpha = 0.8,
-              size = 2,
-              show.legend = FALSE) +
+  geom_jitter(aes(color = Species),  width = 0.15, alpha = 0.8, size = 2, show.legend = FALSE) +
   facet_wrap(~ Species, scales = "fixed") +
   theme_classic(base_size = 14) +
   labs(
@@ -138,23 +131,16 @@ g1 <- ggplot(site_means2, aes(x = Dataset, y = ED50, fill = Species)) +
     y = expression(paste("ED50 (", degree, "C)")),
     title = "ED50 Comparisons Across Temp Ramps"
   ) +
-  theme(
-    strip.text = element_text(face = "bold"),
+  theme(strip.text = element_text(face = "bold"),
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
   theme(legend.position = "none")
 
 g1
+ggsave("C:/github/CBASS/AS-CBASS.2026/Plots/ED50 Comparisons Across Temp Ramps.jpeg", g1, 
+       width = 10, height = 6,  dpi = 300 )     
 
 
-ggsave(
-  filename = "ED50 Comparisons Across Temp Ramps.jpeg",   # file name
-  plot = g1,                                 # the plot object
-  path = "C:/github/CBASS/AS-CBASS.2026/Plots", # folder path
-  width = 10,                               # width in inches
-  height = 6,                               # height in inches
-  dpi = 300                                 # resolution
-)
 
 #run model comparing ED50 estimate from same sites calculated under classic vs refined model------------------------------
 
@@ -167,32 +153,32 @@ dat_shared <- eds_all2 %>%
 
 site_means_shared <- dat_shared %>%
   group_by(Site, Species, Dataset) %>%
-  summarise(ED50 = mean(ED50, na.rm = TRUE), .groups = "drop")
+  summarise(
+    ED50_mean = mean(ED50, na.rm = TRUE),
+    ED50_sd   = sd(ED50, na.rm = TRUE),
+    .groups = "drop"
+  )
 
-#paired test using site as blocking factor
-lm_ramp <- lm(ED50 ~ Dataset * Species + Site, data = site_means_shared)
+#paired test using site as blocking factor to test is refined ramp changes ED values
+lm_ramp <- lm(ED50_mean ~ Dataset * Species + Site, data = site_means_shared)
 anova(lm_ramp) #dataset still not significant
 
+#test if refined ramp reduces variance
+lm_variance <- lm(ED50_sd ~ Dataset * Species, data = site_means_shared)
+anova(lm_variance)
 
 #convert to a paired difference for even cleaner analysis
-#Is ramp bias different from zero?
+#Is ramp bias different from zero, accounting for expected differences between species?
 ramp_diff <- site_means_shared %>%
-  pivot_wider(names_from = Dataset, values_from = ED50) %>%
+  select(-ED50_sd)%>%
+  pivot_wider(names_from = Dataset, values_from = ED50_mean) %>%
   mutate(delta_ED50 = Refined - Classic)
 
 lm_delta <- lm(delta_ED50 ~ Species, data = ramp_diff)
-anova(lm_delta)
-
-ggplot(ramp_diff, aes(Species, delta_ED50)) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_point(aes(color = Site), size = 3) +
-  theme_classic() +
-  ylab("ΔED50 (Refined − Classic)")
-
+summary(lm_delta)
 
 sd(ramp_diff$delta_ED50)
-
-sd(site_means$ED50) 
+sd(site_means_shared$ED50) 
 #ramp bias is small relative to site variation,
 
 
@@ -219,13 +205,5 @@ g2 <- ggplot(site_means_shared, aes(x = Dataset, y = ED50, fill = Species)) +
   theme(legend.position = "none")
 
 g2
-
-
-ggsave(
-  filename = "ED50 Comparisons Across Temp Ramps--paired sites.jpeg",   # file name
-  plot = g1,                                 # the plot object
-  path = "C:/github/CBASS/AS-CBASS.2026/Plots", # folder path
-  width = 10,                               # width in inches
-  height = 6,                               # height in inches
-  dpi = 300                                 # resolution
-)
+ggsave("C:/github/CBASS/AS-CBASS.2026/Plots/ED50 Comparisons Across Temp Ramps--paired sites.jpeg", g2, 
+  width = 10, height = 6, dpi = 300)
