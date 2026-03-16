@@ -36,7 +36,7 @@ validate_cbass_dataset(cbass_dataset)
 
 
 
-####Explore ED5s, ED50s, and ED95s---------------------
+####Explore ED5s, ED50s, ED95s, and Decline Width---------------------
 #create models
 grouping_properties <- c("Site", "Species")
 drm_formula <- "Pam_value ~ Temperature"
@@ -44,6 +44,7 @@ models <- fit_drms(cbass_dataset, grouping_properties, drm_formula, is_curveid =
 
 #get-eds
 eds <- get_all_eds_by_grouping_property(models)
+eds$DW <- eds$ED95 - eds$ED5
 View(eds)
 eds$GroupingProperty[eds$GroupingProperty == "1_AHYA"] <- "1_AHYA_1" #manual fix for when there is only one replicate of a species in the run
 
