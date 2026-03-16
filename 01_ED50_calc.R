@@ -140,7 +140,10 @@ summary_eds_df <- eds_df %>%
             SE_ED95 = sd(ED95) / sqrt(n()),
             # The value 0.975 corresponds to the upper tail probability
             # for a two-tailed t-distribution with a 95% 
-            Conf_Int_95 = qt(0.975, df = n() - 1) * SE_ED95) %>%
+            Conf_Int_95 = qt(0.975, df = n() - 1) * SE_ED95,
+            Mean_DW = mean(DW),
+            SD_DW = sd(DW),
+            SE_DW = sd(DW) / sqrt(n()))%>%
   mutate(across(c(Mean_ED50, SD_ED50, SE_ED50,
                   Mean_ED5, SD_ED5, SE_ED5,
                   Mean_ED95, SD_ED95, SE_ED95,
@@ -203,3 +206,98 @@ tempresp_curve
 #update site name
 save_path <- file.path(output_plot, "Site-011_tempresp_curve.pdf")
 ggsave(save_path, tempresp_curve,  width = 16, height = 9, device = "pdf")
+
+#another way to plot
+
+species_labels <- data.frame(
+  Species = c("AGLO","ICRA","AABR","AHYA"),
+  label = c("italic('Acropora globiceps')",
+            "italic('Isopora crateriformis')",
+            "italic('Acropora abrotanoides')",
+            "italic('Acropora hyacinthus')"),
+  x = 29.2,
+  y = 0.73
+)
+
+facet_labels <- c(
+  AGLO = "italic('Acropora globiceps')",
+  ICRA = "italic('Isopora crateriformis)",
+  AHYA = "italic('Acropora hyacinthus')",
+  AABR = "italic('Acropora abratanoides')"
+)
+
+ggplot(result_df,
+       aes(x = Temperature,
+           y = PredictedPAM,
+           group = GroupingProperty,
+           color = Species)) +
+  
+  geom_line() +
+  
+  geom_ribbon(aes(ymin = Lower,
+                  ymax = Upper,
+                  fill = Species),
+              alpha = 0.2,
+              colour = NA) +
+  
+  geom_segment(aes(x = Mean_ED5,
+                   y = 0,
+                   xend = Mean_ED5,
+                   yend = max(Upper)),
+               linetype = 2) +
+  
+  geom_segment(aes(x = Mean_ED50,
+                   y = 0,
+                   xend = Mean_ED50,
+                   yend = max(Upper)),
+               linetype = 1) +
+  
+  geom_text(aes(x = Mean_ED50,
+                y = 0.73,
+                label = round(Mean_ED50, 2)),
+            size = 3.5,
+            angle = 0,
+            check_overlap = TRUE) +
+  
+  geom_segment(aes(x = Mean_ED95,
+                   y = 0,
+                   xend = Mean_ED95,
+                   yend = max(Upper)),
+               linetype = 2) +
+  
+  geom_point(data = cbass_dataset,
+             aes(x = Temperature,
+                 y = Pam_value,
+                 color = Species),
+             inherit.aes = FALSE) +
+  
+  facet_wrap(~Species,
+             labeller = labeller(facet_labels)) +
+  
+  labs(
+    x = "Temperature (°C)",
+    y = expression(italic(F[v]/F[m]))
+  ) +
+  
+  scale_x_continuous(breaks = seq(29, 40, 1)) +
+  
+  scale_y_continuous(
+    limits = c(0, 0.75),
+    expand = expansion(mult = c(0, 0.02))
+  )+
+  theme(
+    strip.text = element_blank(),
+    strip.background = element_blank(),
+    panel.background = element_rect(fill = "white", colour = "black"), # White panel background
+    plot.background = element_rect(fill = "white", colour = NA),  # overall plot background
+    panel.grid.major = element_blank(),                         
+    panel.grid.minor = element_blank() 
+  ) +
+  
+  geom_text(data = species_labels,
+            aes(x = x, y = y, label = label, color = Species),
+            parse = TRUE,
+            inherit.aes = FALSE,
+            hjust = .09,
+            vjust = 14,
+            size = 3.1)
