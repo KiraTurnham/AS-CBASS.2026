@@ -24,10 +24,13 @@ EDdf <- read_csv("Data/EDsdf_all_ramps.csv") %>%
   filter(Dataset =="All")%>%
   mutate(across(where(is.character), as.factor))
 
+#Calculate decline width (DW)
+EDdf$DW=EDdf$ED95-EDdf$ED5
+
 #long format 
 ED_long <- EDdf %>%
   pivot_longer(
-    cols = c(ED5, ED50, ED95),
+    cols = c(ED5, ED50, ED95, DW),
     names_to = "ED_level",
     values_to = "ED_value"
   ) %>%
@@ -40,6 +43,7 @@ ED_long <- EDdf %>%
 ED5_df  <- filter(ED_long, ED_level == "ED5")
 ED50_df <- filter(ED_long, ED_level == "ED50")
 ED95_df <- filter(ED_long, ED_level == "ED95")
+EDdw_df <- filter(ED_long, ED_level == "DW")
 
 
 #evaluate parametric assumptions
@@ -57,10 +61,15 @@ ED95_df %>%
   summarise(p_value = shapiro.test(ED_value)$p.value)
 #not very normal --> log transform didnʻt help, go non parametric
 
+EDdw_df %>%
+  group_by(Species) %>%
+  summarise(p_value = shapiro.test(ED_value)$p.value)
+
 #Homogeneity of variance
 leveneTest(ED_value ~ Species, data = ED5_df)
 leveneTest(ED_value ~ Species, data = ED50_df)
 leveneTest(ED_value ~ Species, data = ED95_df)
+leveneTest(ED_value ~ Species, data = EDdw_df)
 #all fine here
 
 #log-transformed ED95
@@ -133,7 +142,7 @@ site_summary <- ED_long %>%
   summarise(mean_ED = mean(ED_value), .groups="drop")
 
 
-#boxplot of ED5, 50, 95-----------
+#boxplot of ED5, 50, 95, and DW-----------
 g1 <- ggplot(ED_long, aes(x = Species, y = ED_value, fill = Species)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.8) +
   geom_jitter(aes(color = Species), width = 0.15, alpha = 0.5, size = 1, show.legend = FALSE) +
