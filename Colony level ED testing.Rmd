@@ -1,0 +1,129 @@
+---
+title: "Colony level analyses"
+output: html_document
+date: "2026-03-16"
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(dplyr)
+rm(list = ls())
+
+#calculating ED50 for all datasets and combining with metadata
+#read in metadata
+file_path <-here("Data")
+cbass_metadata<-read_xlsx("Data/ESA_CBASS_metadata.xlsx")
+
+EDsdf<-read.csv("Data/EDsdf-all.csv")
+#read in all site files
+files <- list.files(here("Data"), pattern = "PAM\\.csv$", full.names = TRUE)
+
+
+#combine cbass data
+combined_df <- files %>%
+  map_dfr(~ read_csv(.x) %>% mutate(source_file = basename(.x)))
+
+#join metadata with raw pam value data to get grouping property into metadata
+combined_df <- combined_df %>%
+  left_join(cbass_metadata, by = c("Bag_number", "Species", "Site","Date"))
+
+combined_df <- combined_df %>%
+  mutate(GroupingProperty = paste(Site, Species, Genotype, sep = "_"))
+
+
+#remove duplicates 
+metadata_small <- combined_df %>%
+  mutate(Grouping_property = paste(Site, Species, Genotype, sep = "_")) %>%
+  distinct(Grouping_property, .keep_all = TRUE)
+
+EDsdf_clean <- EDsdf %>%
+  select(-Species, -Site)  # drop duplicates if present
+
+#combine 
+cbass_dataset <- metadata_small %>%
+  left_join(EDsdf_clean, by = c( "GroupingProperty"))
+
+cbass_dataset$DW <- cbass_dataset$ED95 - cbass_dataset$ED5
+#clean
+cbass_dataset <-  cbass_dataset %>% 
+  select(
+    GroupingProperty, 
+    Species, 
+    Tank_color, 
+    Date, 
+    Size_cm, 
+    Partial_mortality, `
+    Colony_depth_ft, 
+    ED50, 
+    ED5, 
+    ED95, 
+    DW)
+
+#long format
+ED_long <- cbass_dataset %>%
+  pivot_longer(
+    cols = c(ED5, ED50, ED95, DW),
+    names_to = "ED_level",
+    values_to = "ED_value"
+  ) %>%
+  mutate(Species = factor(Species, levels = c("AABR", "AHYA", "AGLO", "ICRA")))
+
+#subset each value
+ED50 <- ED_long %>% filter(ED_level == "ED50")
+ED5<- ED_long %>% filter(ED_level == "ED5")
+ED95<- ED_long %>% filter(ED_level == "ED95")
+DW<- ED_long %>% filter(ED_level == "DW")
+```
+
+```{r}
+#visualize patterns
+
+#just change DW, ED95, etc here and plot
+plot_df <- DW %>%
+  pivot_longer(cols = c(Colony_depth_ft, Partial_mortality, Size_cm),
+               names_to = "Predictor",
+               values_to = "Value")
+
+ggplot(plot_df,
+       aes(x = Value, y = ED_value, color = Species)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~Predictor, scales = "free_x") +
+  theme_classic()
+```
+
+
+```{r}
+#remember, Site effects are confounded with experimental runs and are therefore interpreted as block effects!!
+#starting with grouped ED_values
+#Q: Do colony traits affect ED, and do those effects differ among species?
+model <- lmer(
+  ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site),
+  data = ED_long
+)
+
+#add interactions (Does depth affect ED differently in each species? Does PM matter more for some species than others? Does size-sensitivity relationship vary by species?)
+
+model_int <- lmer(
+  ED_value ~ Species * (Colony_depth_ft + Partial_mortality + Size_cm) + (1 | Site),
+  data = ED_long
+)
+
+anova(model, model_int)
+```
+```{r}
+#just ed50
+model <- lmer(
+  ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site),
+  data = ED50
+)
+
+
+model <- lm(
+  ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + Site,
+  data = ED50
+)
+```
+
+
