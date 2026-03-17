@@ -53,12 +53,14 @@ cbass_dataset <-  cbass_dataset %>%
     Tank_color, 
     Date, 
     Size_cm, 
-    Partial_mortality, `
+    Partial_mortality,
     Colony_depth_ft, 
     ED50, 
     ED5, 
     ED95, 
     DW)
+
+write.csv(cbass_dataset, file = "Data/full_cbass_dataset.csv")
 
 #long format
 ED_long <- cbass_dataset %>%
