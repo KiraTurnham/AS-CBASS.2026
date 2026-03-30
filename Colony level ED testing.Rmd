@@ -13,7 +13,7 @@ rm(list = ls())
 #calculating ED50 for all datasets and combining with metadata
 #read in metadata
 file_path <-here("Data")
-  cbass_metadata<-read_xlsx("ESA_CBASS_metadata.xlsx")
+  cbass_metadata<-read_xlsx("Data/ESA_CBASS_metadata.xlsx")
 
 EDsdf<-read.csv("Data/EDsdf-all.csv")
 #read in all site files
@@ -49,7 +49,8 @@ cbass_dataset$DW <- cbass_dataset$ED95 - cbass_dataset$ED5
 cbass_dataset <-  cbass_dataset %>% 
   select(
     GroupingProperty, 
-    Species, 
+    Species,
+    Site,
     Tank_color, 
     Date, 
     Size_cm, 
@@ -82,7 +83,7 @@ DW<- ED_long %>% filter(ED_level == "DW")
 #visualize patterns
 
 #just change DW, ED95, etc here and plot
-plot_df <- ED50 %>%
+plot_df <- DW %>%
   pivot_longer(cols = c(Colony_depth_ft, Partial_mortality, Size_cm),
                names_to = "Predictor",
                values_to = "Value")
@@ -92,6 +93,7 @@ ggplot(plot_df,
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~Predictor, scales = "free_x") +
+  ylab("DW")+
   theme_classic()
 ```
 
@@ -99,33 +101,133 @@ ggplot(plot_df,
 ```{r}
 #remember, Site effects are confounded with experimental runs and are therefore interpreted as block effects!!
 #starting with grouped ED_values
-#Q: Do colony traits affect ED, and do those effects differ among species?
-model <- lmer(
-  ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site),
-  data = ED_long
-)
 
-#add interactions (Does depth affect ED differently in each species? Does PM matter more for some species than others? Does size-sensitivity relationship vary by species?)
+#Q: Do colony traits affect ED, and do those effects differ among species? By using the split(ED_long, ED_long$ED_level), can test effect of each ED level.
+models_main <- lapply(split(ED_long, ED_long$ED_level), function(df) {
+  lmer(
+    ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site),
+    data = df
+  )
+})
 
-model_int <- lmer(
-  ED_value ~ Species * (Colony_depth_ft + Partial_mortality + Size_cm) + (1 | Site),
-  data = ED_long
-)
 
-anova(model, model_int)
+#add interactions (does xxx affect ED differently in each species)
+
+models_int <- lapply(split(ED_long, ED_long$ED_level), function(df) {
+  lmer(
+    ED_value ~ Species * (Colony_depth_ft + Partial_mortality + Size_cm) + (1 | Site),
+    data = df
+  )
+})
+
+
+#compare models
+anova_table <- lapply(names(models_main), function(ed) {
+  m1 <- models_main[[ed]]
+  m2 <- models_int[[ed]]
+  
+  an <- anova(m1, m2)
+  
+  an_df <- as.data.frame(an) %>%
+    rownames_to_column("model") %>%
+    mutate(ED_level = ed)
+  
+  an_df
+}) %>%
+  bind_rows()
+
+anova_table
+
+#model 1 show lower aic vals for each ED_level. no strong support for interactions
+
+
+
+
+#extract
+anova_main <- lapply(names(models_main), function(ed) {
+  m <- models_main[[ed]]
+  
+  an <- anova(m)
+  
+  an_df <- as.data.frame(an) %>%
+    rownames_to_column("term") %>%
+    mutate(ED_level = ed)
+  
+  an_df
+}) %>%
+  bind_rows()
+
+anova_main
+
+
+#emmeans
+emmeans_table <- lapply(names(models_main), function(ed) {
+  m <- models_main[[ed]]
+  
+  em <- emmeans(m, pairwise ~ Species)
+  
+  tidy(em$contrasts) %>%
+    mutate(ED_level = ed)
+}) %>%
+  bind_rows()
+
+emmeans_table
 ```
+
+
 ```{r}
-#just ed50
-model <- lmer(
-  ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site),
-  data = ED50
-)
+#individual trait effects
+
+#depth
+depth_table <- lapply(names(models_main), function(ed) {
+  m <- models_main[[ed]]
+  
+  em <- emtrends(m, ~ Species, var = "Colony_depth_ft")
+  
+  tidy(em) %>%
+    mutate(ED_level = ed, predictor = "Depth")
+}) %>%
+  bind_rows()
+
+#PM
+pm_table <- lapply(names(models_main), function(ed) {
+  m <- models_main[[ed]]
+  
+  em <- emtrends(m, ~ Species, var = "Partial_mortality")
+  
+  tidy(em) %>%
+    mutate(ED_level = ed, predictor = "PM")
+}) %>%
+  bind_rows()
+
+#size
+size_table <- lapply(names(models_main), function(ed) {
+  m <- models_main[[ed]]
+  
+  em <- emtrends(m, ~ Species, var = "Size_cm")
+  
+  tidy(em) %>%
+    mutate(ED_level = ed, predictor = "Size")
+}) %>%
+  bind_rows()
+
+trait_effects <- bind_rows(depth_table, pm_table, size_table)
+
+trait_effects
 
 
-model <- lm(
-  ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + Site,
-  data = ED50
-)
 ```
 
+```{r}
+#combined traits
+lmm_traits_combined <- lmer(
+  ED_value ~ Species * ED_level +
+    Colony_depth_ft + Partial_mortality + Size_cm +
+    (1 | Site),
+  data = ED_long
+)
+
+anova(lmm_traits_combined)
+#ED_level is sig
+```
 
