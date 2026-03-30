@@ -64,6 +64,7 @@ ED95_df %>%
 EDdw_df %>%
   group_by(Species) %>%
   summarise(p_value = shapiro.test(ED_value)$p.value)
+#AHYA and AGLO not normal 
 
 #Homogeneity of variance
 leveneTest(ED_value ~ Species, data = ED5_df)
@@ -116,6 +117,14 @@ par(mfrow = c(1,2))
 plot(resid(m_ED95) ~ fitted(m_ED95))
 qqnorm(resid(m_ED95))
 qqline(resid(m_ED95))
+
+#check residual diagnostics for DW
+m_EDdw <- lmer(ED_value ~ Species + (1|Site), data = EDdw_df)
+# residual diagnostics
+par(mfrow = c(1,2))
+plot(resid(m_EDdw) ~ fitted(m_EDdw))
+qqnorm(resid(m_EDdw))
+qqline(resid(m_EDdw))
 
 #alternatively, fit a combined model:
 lmm_combined <- lmer(ED_value ~ Species * ED_level + (1 | Site), data = ED_long)
@@ -175,8 +184,8 @@ g2 <- ggplot(ED_long, aes(x = Species, y = ED_value)) +
                     ymin = Mean - SE,
                     ymax = Mean + SE,
                     color = Species),
-                width = 0.2,
-                size = 0.8,
+                width = 0.3,
+                size = 1,
                 inherit.aes = FALSE) +
   
   facet_wrap(~ ED_level, scales = "free_y") +
@@ -196,7 +205,7 @@ g2 <- ggplot(ED_long, aes(x = Species, y = ED_value)) +
 g2
 
 
-ggsave("C:/github/CBASS/AS-CBASS.2026/Plots/All_sites_boxplot.pdf", g1,  width = 16, height = 9, device = "pdf")
-ggsave("C:/github/CBASS/AS-CBASS.2026/Plots/All_sites_points&means.pdf", g2,  width = 16, height = 9, device = "pdf")
+ggsave("Plots/All_sites_boxplot.pdf", g1,  width = 16, height = 9, device = "pdf")
+ggsave("Plots/All_sites_points&means.pdf", g2,  width = 16, height = 9, device = "pdf")
 
 
