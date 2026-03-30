@@ -13,7 +13,7 @@ rm(list = ls())
 #calculating ED50 for all datasets and combining with metadata
 #read in metadata
 file_path <-here("Data")
-cbass_metadata<-read_xlsx("Data/ESA_CBASS_metadata.xlsx")
+  cbass_metadata<-read_xlsx("ESA_CBASS_metadata.xlsx")
 
 EDsdf<-read.csv("Data/EDsdf-all.csv")
 #read in all site files
@@ -82,7 +82,7 @@ DW<- ED_long %>% filter(ED_level == "DW")
 #visualize patterns
 
 #just change DW, ED95, etc here and plot
-plot_df <- DW %>%
+plot_df <- ED50 %>%
   pivot_longer(cols = c(Colony_depth_ft, Partial_mortality, Size_cm),
                names_to = "Predictor",
                values_to = "Value")
