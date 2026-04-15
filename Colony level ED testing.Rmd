@@ -45,6 +45,9 @@ bloop_cluster <- bloop_cluster %>%
   ) %>%
   select(-clean)
   
+ to_remove <- c("t3_aglo3", "t4_aglo7", "t9_aabr1", "t11_icra8", "t11_icra5", "t11_icra10")
+ 
+bloop_cluster <- bloop_cluster %>% filter(!SampleID_clean %in% to_remove)
 
 #combine cbass data
 combined_df <- files %>%
@@ -118,6 +121,28 @@ ICRA<- ED_long %>% filter(Species == "ICRA")
   AABR<- ED_long %>% filter(Species == "AABR")
   AHYA<- ED_long %>% filter(Species == "AHYA")
 ```
+```{r}
+
+  to_remove <- c("t3_aglo3", "t4_aglo7", "t9_aabr1", "t11_icra8", "t11_icra5" "t11_icra10")
+df_clean <- bloop_cluster %>% filter(!SampleID %in% to_remove)
+
+  remove rows where SampleID_clean is "t3_aglo3" "t4_aglo7" "t9_aabr1" "t11_icra8" "t11_icra5" "t11_icra10"
+
+ED_long %>%
+  filter(ED_level == "ED50") %>%
+  mutate(Cluster_5 = as.factor(Cluster_5)) %>%
+  ggplot(aes(x = Cluster_5, y = ED_value, fill = Cluster_5)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  geom_jitter(width = 0.15, alpha = 0.6, size = 2) +
+  facet_wrap(~Species, scales = "free_y") +
+  theme_bw() +
+  labs(
+    x = "Phenotype Cluster",
+    y = "ED50",
+    title = "ED50 variation among phenotype clusters within species"
+  )
+```
+
 
 ```{r}
 #visualize patterns across all taxa
