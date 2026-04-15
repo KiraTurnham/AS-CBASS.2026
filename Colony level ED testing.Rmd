@@ -12,7 +12,8 @@ library(readxl)
 library(lmerTest)
 library(emmeans)
 library(broom)
-#rm(list = ls())
+library(lme4)
+rm(list = ls())
 
 #calculating ED50 for all datasets and combining with metadata
 #read in metadata
@@ -23,7 +24,24 @@ EDsdf<-read.csv("Data/EDsdf-all.csv")
 #read in all site files
 files <- list.files(here("Data"), pattern = "PAM\\.csv$", full.names = TRUE)
 
-cluster_df<-read.csv("Data/cluster_by_ks.csv")
+
+
+#read in MAPP cluster df
+bloop_cluster<- read.csv("Data/expt_data_clustered.csv")
+bloop_cluster <- bloop_cluster %>%
+  mutate(
+    clean = SampleID_clean %>%
+      tolower() %>%
+      sub("^t", "", .),   # remove leading "t"
+    
+    site = sub("_.*", "", clean),
+    species = sub(".*_([a-z]+)[0-9]+$", "\\1", clean),
+    genotype = sub(".*_([a-z]+)([0-9]+)$", "\\2", clean),
+    
+    GroupingProperty = paste(site, toupper(species), genotype, sep = "_")
+  ) %>%
+  select(-clean)
+  
 
 #combine cbass data
 combined_df <- files %>%
@@ -48,9 +66,9 @@ EDsdf_clean <- EDsdf %>%
 #combine 
 cbass_dataset <- metadata_small %>%
   left_join(EDsdf_clean, by = "GroupingProperty") %>%
-  left_join(cluster_df, by = "GroupingProperty")
 
-cbass_dataset
+  left_join(bloop_cluster, by = "GroupingProperty")
+
 
 cbass_dataset$DW <- cbass_dataset$ED95 - cbass_dataset$ED5
 #clean
@@ -90,10 +108,14 @@ ED50 <- ED_long %>% filter(ED_level == "ED50")
 ED5<- ED_long %>% filter(ED_level == "ED5")
 ED95<- ED_long %>% filter(ED_level == "ED95")
 DW<- ED_long %>% filter(ED_level == "DW")
+
+#subset ICRA
+ICRA<- ED_long %>% filter(Species == "ICRA")
+                       
 ```
 
 ```{r}
-#visualize patterns
+#visualize patterns across all taxa
 
 #just change DW, ED95, etc here and plot
 plot_df <- DW %>%
@@ -105,11 +127,28 @@ ggplot(plot_df,
        aes(x = Value, y = ED_value, color = Species)) +
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~Predictor, scales = "free_x") +
-  ylab("DW")+
+    facet_grid(ED_level ~ Predictor, scales = "free") 
+
+```
+
+```{r}
+#just change DW, ED95, etc here and plot
+plot_icra <- ICRA %>%
+  pivot_longer(
+    cols = c(Size_cm, Partial_mortality, Colony_depth_ft),
+    names_to = "Predictor",
+    values_to = "Value"
+  )
+ggplot(plot_icra,
+       aes(x = Value, y = ED_value)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "black") +
+  facet_wrap(ED_level ~ Predictor, scales = "free") +
   theme_classic()
 
+
 #subset icra to look at PM
+
 ```
 
 
