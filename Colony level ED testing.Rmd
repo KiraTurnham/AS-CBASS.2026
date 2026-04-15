@@ -8,7 +8,11 @@ date: "2026-03-16"
 library(tidyverse)
 library(here)
 library(dplyr)
-rm(list = ls())
+library(readxl)
+library(lmerTest)
+library(emmeans)
+library(broom)
+#rm(list = ls())
 
 #calculating ED50 for all datasets and combining with metadata
 #read in metadata
@@ -19,6 +23,7 @@ EDsdf<-read.csv("Data/EDsdf-all.csv")
 #read in all site files
 files <- list.files(here("Data"), pattern = "PAM\\.csv$", full.names = TRUE)
 
+cluster_df<-read.csv("Data/cluster_by_ks.csv")
 
 #combine cbass data
 combined_df <- files %>%
@@ -42,7 +47,10 @@ EDsdf_clean <- EDsdf %>%
 
 #combine 
 cbass_dataset <- metadata_small %>%
-  left_join(EDsdf_clean, by = c( "GroupingProperty"))
+  left_join(EDsdf_clean, by = "GroupingProperty") %>%
+  left_join(cluster_df, by = "GroupingProperty")
+
+cbass_dataset
 
 cbass_dataset$DW <- cbass_dataset$ED95 - cbass_dataset$ED5
 #clean
@@ -59,7 +67,12 @@ cbass_dataset <-  cbass_dataset %>%
     ED50, 
     ED5, 
     ED95, 
-    DW)
+    DW,
+    Cluster_4,
+    Cluster_5,
+    Cluster_6,
+    Cluster_7,
+    Cluster_8)
 
 write.csv(cbass_dataset, file = "Data/full_cbass_dataset.csv")
 
@@ -95,6 +108,8 @@ ggplot(plot_df,
   facet_wrap(~Predictor, scales = "free_x") +
   ylab("DW")+
   theme_classic()
+
+#subset icra to look at PM
 ```
 
 
