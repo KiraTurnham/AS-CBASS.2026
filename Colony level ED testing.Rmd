@@ -45,9 +45,6 @@ bloop_cluster <- bloop_cluster %>%
   ) %>%
   select(-clean)
   
- to_remove <- c("t3_aglo3", "t4_aglo7", "t9_aabr1", "t11_icra8", "t11_icra5", "t11_icra10")
- 
-bloop_cluster <- bloop_cluster %>% filter(!SampleID_clean %in% to_remove)
 
 #combine cbass data
 combined_df <- files %>%
@@ -55,7 +52,7 @@ combined_df <- files %>%
 
 #join metadata with raw pam value data to get grouping property into metadata
 combined_df <- combined_df %>%
-  left_join(cbass_metadata, by = c("Bag_number", "Species", "Site","Date"))
+  left_join(cbass_metadata, by = c("Bag_number", "Species", "Site"))
 
 combined_df <- combined_df %>%
   mutate(GroupingProperty = paste(Site, Species, Genotype, sep = "_"))
@@ -84,7 +81,6 @@ cbass_dataset <-  cbass_dataset %>%
     Species,
     Site,
     Tank_color, 
-    Date, 
     Size_cm, 
     Partial_mortality,
     Colony_depth_ft, 
@@ -121,15 +117,15 @@ ICRA<- ED_long %>% filter(Species == "ICRA")
   AABR<- ED_long %>% filter(Species == "AABR")
   AHYA<- ED_long %>% filter(Species == "AHYA")
 ```
+
 ```{r}
 
-  to_remove <- c("t3_aglo3", "t4_aglo7", "t9_aabr1", "t11_icra8", "t11_icra5" "t11_icra10")
-df_clean <- bloop_cluster %>% filter(!SampleID %in% to_remove)
+#removing sus samples that the cluster analysis show are likely mos-labeled (6 samples total)
+  to_remove <- c("3_AGLO_3", "4_AGLO_7", "9_AABR_1", "11_ICRA_8", "11_ICRA_5", "11_ICRA_10")
+df_clean <- ED_long %>% filter(!GroupingProperty %in% to_remove)
 
-  remove rows where SampleID_clean is "t3_aglo3" "t4_aglo7" "t9_aabr1" "t11_icra8" "t11_icra5" "t11_icra10"
-
-ED_long %>%
-  filter(ED_level == "ED50") %>%
+df_clean %>%
+  filter(ED_level == "ED95") %>%
   mutate(Cluster_5 = as.factor(Cluster_5)) %>%
   ggplot(aes(x = Cluster_5, y = ED_value, fill = Cluster_5)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.7) +
@@ -138,8 +134,8 @@ ED_long %>%
   theme_bw() +
   labs(
     x = "Phenotype Cluster",
-    y = "ED50",
-    title = "ED50 variation among phenotype clusters within species"
+    y = "ED5",
+    title = "ED5 variation among phenotype clusters within species"
   )
 ```
 
@@ -493,11 +489,15 @@ m8 <- lm(ED_value ~ ED_level + Cluster_8, data=ICRA)
 AIC(m4,m5,m6, m7, m8)
 #models 4 and 5 are tied
 
-m4 <- lm(ED_value ~ ED_level + Cluster_4 + Size_cm + Partial_mortality +
- (1|Site) + (1|GroupingProperty), data=ICRA)
+m4 <- lm(ED95 ~ Species * Cluster_5 +
+ (1|Site), data=cbass_dataset)
 m5 <- lm(ED_value ~ ED_level + Cluster_5, data=ICRA)
 
 anova(m4)
+
+emmans for 
+
+
 anova(m5)
 
 
