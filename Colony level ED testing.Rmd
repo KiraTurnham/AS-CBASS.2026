@@ -29,7 +29,7 @@ files <- list.files(here("Data"), pattern = "PAM\\.csv$", full.names = TRUE)
 
 
 
-#read in MAPP cluster df
+#read in MAPP cluster df and fix sample ID names/cols
 bloop_cluster<- read.csv("Data/expt_data_clustered.csv")
 bloop_cluster <- bloop_cluster %>%
   mutate(
@@ -119,7 +119,7 @@ ICRA<- ED_long %>% filter(Species == "ICRA")
 ```
 
 ```{r}
-
+#make phenotype plot
 #removing sus samples that the cluster analysis show are likely mos-labeled (6 samples total)
   to_remove <- c("3_AGLO_3", "4_AGLO_7", "9_AABR_1", "11_ICRA_8", "11_ICRA_5", "11_ICRA_10")
 df_clean <- ED_long %>% filter(!GroupingProperty %in% to_remove)
@@ -489,13 +489,10 @@ m8 <- lm(ED_value ~ ED_level + Cluster_8, data=ICRA)
 AIC(m4,m5,m6, m7, m8)
 #models 4 and 5 are tied
 
-m4 <- lm(ED95 ~ Species * Cluster_5 +
- (1|Site), data=cbass_dataset)
-m5 <- lm(ED_value ~ ED_level + Cluster_5, data=ICRA)
 
 anova(m4)
 
-emmans for 
+emmans 
 
 
 anova(m5)
