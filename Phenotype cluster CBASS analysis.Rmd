@@ -73,8 +73,8 @@ df_clean$Cluster_6 <- as.factor(df_clean$Cluster_6)
 df_clean$Cluster_7 <- as.factor(df_clean$Cluster_7)
 df_clean$Cluster_8 <- as.factor(df_clean$Cluster_8)
 
-#lm
-#change ED level
+#basic lm
+#change ED level but since all are collinear, feel ok about just analyzing ED50 here.
 ED <- df_clean$ED50
 m4 <- lm(ED ~ Species + Cluster_4, data=df_clean)
 m5 <- lm(ED ~ Species + Cluster_5, data=df_clean)
@@ -117,7 +117,7 @@ m <- lmer(ED50 ~ Species * Cluster_4 + (1|Site), data=df_clean)
 emmeans(m, pairwise ~ Cluster_4)
 emmeans(m, pairwise ~ Species)
 emmeans(m, pairwise ~ Species | Cluster_4)
-emmeans(m, pairwise ~ Cluster_4 | Species)
+emmeans(m, pairwise ~ Cluster_4 | Species) #this one shows sig differences within species, phenotype cluster predicts ed50!
 
 emm <- emmeans(m, ~ Cluster_4 | Species)
 
