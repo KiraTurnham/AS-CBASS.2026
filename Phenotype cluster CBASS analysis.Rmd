@@ -1,0 +1,125 @@
+---
+title: "Phenotype cluster CBASS analysis"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(dplyr)
+library(readxl)
+library(lmerTest)
+library(emmeans)
+library(broom)
+library(lme4)
+library(car)
+library(corrplot)
+library(Hmisc )
+rm(list = ls())
+
+#calculating ED50 for all datasets and combining with metadata
+#read in data
+file_path <-here("Data")
+  cbass<-read.csv("Data/full_cbass_dataset.csv")
+  
+#removing sus samples that the cluster analysis show are likely mos-labeled (6 samples total)
+  to_remove <- c("3_AGLO_3", "4_AGLO_7", "9_AABR_1", "11_ICRA_8", "11_ICRA_5", "11_ICRA_10")
+df_clean <- cbass %>% filter(!GroupingProperty %in% to_remove)
+
+#long format
+ED_long <- df_clean %>%
+  pivot_longer(
+    cols = c(ED5, ED50, ED95, DW),
+    names_to = "ED_level",
+    values_to = "ED_value"
+  ) %>%
+  mutate(Species = factor(Species, levels = c("AABR", "AHYA", "AGLO", "ICRA")))
+
+#subset each value
+ED50 <- ED_long %>% filter(ED_level == "ED50")
+ED5<- ED_long %>% filter(ED_level == "ED5")
+ED95<- ED_long %>% filter(ED_level == "ED95")
+DW<- ED_long %>% filter(ED_level == "DW")
+
+
+
+```
+
+```{r}
+#Make a boxplot showing ED by cluster
+ED_long %>%
+  filter(ED_level == "ED50") %>%
+  mutate(Cluster_4 = as.factor(Cluster_4)) %>%
+  ggplot(aes(x = Cluster_4, y = ED_value, fill = Cluster_4)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  geom_jitter(width = 0.15, alpha = 0.6, size = 2) +
+  facet_wrap(~Species, scales = "free_y") +
+  theme_bw() +
+  labs(
+    x = "Phenotype Cluster",
+    y = "ED",
+    title = "ED variation among phenotype clusters within species"
+  )
+```
+
+
+```{r}
+#look for cluster with lowest AIC in model
+
+#make sure cluster is factor not numeric
+df_clean$Cluster_4 <- as.factor(df_clean$Cluster_4)
+df_clean$Cluster_5 <- as.factor(df_clean$Cluster_5)
+df_clean$Cluster_6 <- as.factor(df_clean$Cluster_6)
+df_clean$Cluster_7 <- as.factor(df_clean$Cluster_7)
+df_clean$Cluster_8 <- as.factor(df_clean$Cluster_8)
+
+#lm
+#change ED level
+ED <- df_clean$ED50
+m4 <- lm(ED ~ Species + Cluster_4, data=df_clean)
+m5 <- lm(ED ~ Species + Cluster_5, data=df_clean)
+m6 <- lm(ED ~ Species + Cluster_6, data=df_clean)
+m7 <- lm(ED ~ Species + Cluster_7, data=df_clean)
+m8 <- lm(ED ~ Species + Cluster_8,  data=df_clean)
+
+AIC(m4,m5,m6, m7, m8)
+#model 8 is lowest for ED50, model 4 is lowest for ED5, ED95, and DW
+
+
+anova(m4)
+anova(m8)
+
+#lmer
+#Adding in site
+ED <- df_clean$ED50
+m4 <- lmer(ED ~ Species + Cluster_4 + (1|Site), data=df_clean)
+m5 <- lmer(ED ~ Species + Cluster_5 + (1|Site), data=df_clean)
+m6 <- lmer(ED ~ Species + Cluster_6 + (1|Site), data=df_clean)
+m7 <- lmer(ED ~ Species + Cluster_7 + (1|Site), data=df_clean)
+m8 <- lmer(ED ~ Species + Cluster_8 + (1|Site), data=df_clean)
+AIC(m4,m5,m6, m7, m8)
+#model 4 is lowest for ED50, model 5 is lowest for ED5, ED95, and DW
+
+#lmer
+#Adding in site and interaction of spp
+ED <- df_clean$ED50
+m4i <- lmer(ED ~ Species * Cluster_4 + (1|Site), data=df_clean)
+m5i <- lmer(ED ~ Species * Cluster_5 + (1|Site), data=df_clean)
+m6i <- lmer(ED ~ Species * Cluster_6 + (1|Site), data=df_clean)
+m7i <- lmer(ED ~ Species * Cluster_7 + (1|Site), data=df_clean)
+m8i <- lmer(ED ~ Species * Cluster_8 + (1|Site), data=df_clean)
+AIC(m4i,m5i,m6i, m7i, m8i)
+
+
+anova(m4i)
+
+m <- lmer(ED50 ~ Species * Cluster_4 + (1|Site), data=df_clean)
+emmeans(m, pairwise ~ Cluster_4)
+emmeans(m, pairwise ~ Species)
+emmeans(m, pairwise ~ Species | Cluster_4)
+emmeans(m, pairwise ~ Cluster_4 | Species)
+
+emm <- emmeans(m, ~ Cluster_4 | Species)
+
+plot(emm)
+```
