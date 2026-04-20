@@ -41,6 +41,11 @@ ED5<- ED_long %>% filter(ED_level == "ED5")
 ED95<- ED_long %>% filter(ED_level == "ED95")
 DW<- ED_long %>% filter(ED_level == "DW")
 
+#subset each spp
+ICRA <- df_clean %>% filter(Species == "ICRA")
+AGLO<- df_clean %>% filter(Species == "AGLO")
+AABR<- df_clean %>% filter(Species == "AABR")
+AHYA<- df_clean %>% filter(Species == "AHYA")
 
 
 ```
@@ -73,7 +78,84 @@ df_clean$Cluster_6 <- as.factor(df_clean$Cluster_6)
 df_clean$Cluster_7 <- as.factor(df_clean$Cluster_7)
 df_clean$Cluster_8 <- as.factor(df_clean$Cluster_8)
 
-#basic lm
+#Here analyzing cluster as within-species explanatory trait, not across spp.
+
+#main spp model (pick whether interaction is best or not)
+m1<-lmer(ED50 ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+ data=df_clean
+)
+
+m2<-lmer(ED50 ~ Species * (Colony_depth_ft + Partial_mortality + Size_cm) + (1|Site),
+ data=df_clean
+)
+
+anova(m1, m2)
+#m1 has lower AIC
+
+summary(m1)
+
+#then run model for each individual spp. Played with putting in all predictors and cluster, but didnt make much difference.
+m_icra<-lmer(ED50 ~ Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=ICRA)
+
+m_aglo<-lmer(ED50 ~ Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=AGLO)
+
+m_aabr<-lmer(ED50 ~ Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=AABR)
+
+summary(m_icra)
+#summary(m_ahya)
+summary(m_aglo)
+summary(m_aabr)
+
+#ahya only one group for Cluster_4
+
+
+emmeans(m_aabr, pairwise ~ Cluster_4)
+emmeans(m_icra, pairwise ~ Cluster_4)
+emmeans(m_aglo, pairwise ~ Cluster_4)
+#emmeans(m_ahya, pairwise ~ Cluster_5)
+```
+```{r}
+#run t test for each spp indivudually
+  
+#test normality with Shapiro test
+  ICRA %>%
+  #group_by(Cluster_4) %>%
+  summarise(p_value = shapiro.test(ED50)$p.value)
+  
+  AGLO %>%
+    #group_by(Cluster_4) %>%
+  summarise(p_value = shapiro.test(ED50)$p.value)
+  
+  AABR %>%
+   # group_by(Cluster_4) %>%
+  summarise(p_value = shapiro.test(ED50)$p.value)
+  
+ #AHYA is only one group 
+  AHYA%>%
+    summarise(p_value = shapiro.test(ED50)$p.value)
+  # Not normal 0.045
+  
+#Homogeneity of varience
+  
+  leveneTest(ED50 ~ Cluster_4, data = ICRA)
+  leveneTest(ED50 ~ Cluster_4, data = AGLO)
+  leveneTest(ED50 ~ Cluster_4, data = AABR)
+  #leveneTest(ED50 ~ Cluster_4, data = AHYA) #needs 2 or more levels
+
+#Run T test
+  t.test(formula = ED50 ~ Cluster_4, data=ICRA, var.equal = TRUE )
+  # p-value = 0.03398 
+
+  t.test(formula = ED50 ~ Cluster_4, data=AGLO, var.equal = TRUE )
+  #p-value = 0.8928
+  
+    t.test(formula = ED50 ~ Cluster_4, data=AABR, var.equal = TRUE )
+    #p-value = 0.06691
+  
+```
+
+```{r}
+#here is analysis for analyzing cluster across spp. probably can delete.
 #change ED level but since all EDs/DW are collinear, feel ok about just analyzing ED50 here.
 ED <- df_clean$ED50
 m4 <- lm(ED ~ Species + Cluster_4, data=df_clean)
@@ -124,49 +206,71 @@ emm<- emmeans(m, pairwise ~ Cluster_4 | Species) #within spp comparisons of clus
 plot(emm)
 ```
 
+
 ```{r}
-#run t test for each spp indivudually
+#species-specific cluster within soecies (make nested factor) basically using cluster as within-species explanatory trait, not across.
+df_clean$SpCluster <- interaction(df_clean$Species, df_clean$Cluster_4)
 
-#subset spp
-ICRA<- df_clean %>% filter(Species == "ICRA")
-  AGLO<- df_clean %>% filter(Species == "AGLO")
-  AABR<- df_clean %>% filter(Species == "AABR")
-  AHYA<- df_clean %>% filter(Species == "AHYA")
-  
-#test normality with Shapiro test
-  ICRA %>%
-  #group_by(Cluster_4) %>%
-  summarise(p_value = shapiro.test(ED50)$p.value)
-  
-  AGLO %>%
-    #group_by(Cluster_4) %>%
-  summarise(p_value = shapiro.test(ED50)$p.value)
-  
-  AABR %>%
-   # group_by(Cluster_4) %>%
-  summarise(p_value = shapiro.test(ED50)$p.value)
-  
- #AHYA is only one group 
-  AHYA%>%
-    summarise(p_value = shapiro.test(ED50)$p.value)
-  # Not normal 0.045
-  
-#Homogeneity of varience
-  
-  leveneTest(ED50 ~ Cluster_4, data = ICRA)
-  leveneTest(ED50 ~ Cluster_4, data = AGLO)
-  leveneTest(ED50 ~ Cluster_4, data = AABR)
-  #leveneTest(ED50 ~ Cluster_4, data = AHYA) #needs 2 or more levels
+lmer(
+ ED50 ~ Species + SpCluster +
+   Colony_depth_ft + Partial_mortality + Size_cm +
+   (1|Site),
+ data=df_clean
+)
 
-#Run T test
-  t.test(formula = ED50 ~ Cluster_4, data=ICRA, var.equal = TRUE )
-  # p-value = 0.03398
+#main spp model
+m1<-lmer(ED50 ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+ data=df_clean
+)
 
-  t.test(formula = ED50 ~ Cluster_4, data=AGLO, var.equal = TRUE )
-  #p-value = 0.8928
-  
-    t.test(formula = ED50 ~ Cluster_4, data=AABR, var.equal = TRUE )
-    #p-value = 0.06691
-  
+m2<-lmer(ED50 ~ Species * (Colony_depth_ft + Partial_mortality + Size_cm) + (1|Site),
+ data=df_clean
+)
+
+anova(m1, m2)
+#m1 has lower AIC
+
+#then run for each individual spp
+m_icra<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+ data=ICRA
+)
+
+m_aglo<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+ data=AGLO
+)
+
+m_aabr<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+ data=AABR
+)
+
+#ahya only one group
+ m_ahya<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+  data=AHYA
+ )
+
+emmeans(m_aabr, pairwise ~ Cluster_5)
+emmeans(m_icra, pairwise ~ Cluster_5)
+emmeans(m_aglo, pairwise ~ Cluster_5)
+emmeans(m_ahya, pairwise ~ Cluster_5)
+```
+
+
+```{r}
+#add in partial mortality, colony size and depth to model. this is still assuming can compare across spp!
+
+m9<-lmer(
+    ED50 ~ Species +  Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site), data = df_clean)
+
+m10<- lmer(
+    ED50 ~ Species * ( Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm) + (1 | Site), data = df_clean)
+
+anova(m9, m10) 
+#M9 has lower AIC
+summary(m9)
+emmeans(m9, ~ Species)
+emmeans(m9, pairwise ~ Species)
+emmeans(m2, ~ Cluster_4)
+emmeans(m2, pairwise ~ Cluster_4)
+emmeans(m9, pairwise ~ Cluster_4 | Species)
 ```
 
