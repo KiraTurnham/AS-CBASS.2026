@@ -57,8 +57,8 @@ ED_long %>%
   theme_bw() +
   labs(
     x = "Phenotype Cluster",
-    y = "ED",
-    title = "ED variation among phenotype clusters within species"
+    y = "ED50",
+    title = "ED50 variation among phenotype clusters within species"
   )
 ```
 
@@ -101,7 +101,7 @@ AIC(m4,m5,m6, m7, m8)
 #model 4 is lowest for ED50, model 5 is lowest for ED5, ED95, and DW
 
 #lmer
-#Adding interaction of site and spp
+#Adding interaction of spp and cluster
 ED <- df_clean$ED50
 m4i <- lmer(ED ~ Species * Cluster_4 + (1|Site), data=df_clean)
 m5i <- lmer(ED ~ Species * Cluster_5 + (1|Site), data=df_clean)
@@ -109,17 +109,64 @@ m6i <- lmer(ED ~ Species * Cluster_6 + (1|Site), data=df_clean)
 m7i <- lmer(ED ~ Species * Cluster_7 + (1|Site), data=df_clean)
 m8i <- lmer(ED ~ Species * Cluster_8 + (1|Site), data=df_clean)
 AIC(m4i,m5i,m6i, m7i, m8i)
-
+#model 4 is lowest, and this model is lower than w/o interaction
 
 anova(m4i)
 
 m <- lmer(ED50 ~ Species * Cluster_4 + (1|Site), data=df_clean)
-emmeans(m, pairwise ~ Cluster_4)
-emmeans(m, pairwise ~ Species)
-emmeans(m, pairwise ~ Species | Cluster_4)
-emmeans(m, pairwise ~ Cluster_4 | Species) #this one shows sig differences within species, phenotype cluster predicts ed50!
+# emmeans(m, pairwise ~ Cluster_4)
+# emmeans(m, pairwise ~ Species)
+ emmeans(m, pairwise ~ Species | Cluster_4) #this is across spp, doesnt make sense to me to use this. I think we just want to see if within species, clusters are differenct from eachother.
+emm<- emmeans(m, pairwise ~ Cluster_4 | Species) #within spp comparisons of clusters: sig differences within species, phenotype cluster predicts ed50!
 
-emm <- emmeans(m, ~ Cluster_4 | Species)
+#emm <- emmeans(m, ~ Cluster_4 | Species)
 
 plot(emm)
 ```
+
+```{r}
+#run t test for each spp indivudually
+
+#subset spp
+ICRA<- df_clean %>% filter(Species == "ICRA")
+  AGLO<- df_clean %>% filter(Species == "AGLO")
+  AABR<- df_clean %>% filter(Species == "AABR")
+  AHYA<- df_clean %>% filter(Species == "AHYA")
+  
+#test normality with Shapiro test
+  ICRA %>%
+  #group_by(Cluster_4) %>%
+  summarise(p_value = shapiro.test(ED50)$p.value)
+  
+  AGLO %>%
+    #group_by(Cluster_4) %>%
+  summarise(p_value = shapiro.test(ED50)$p.value)
+  
+  AABR %>%
+   # group_by(Cluster_4) %>%
+  summarise(p_value = shapiro.test(ED50)$p.value)
+  
+ #AHYA is only one group 
+  AHYA%>%
+    summarise(p_value = shapiro.test(ED50)$p.value)
+  # Not normal 0.045
+  
+#Homogeneity of varience
+  
+  leveneTest(ED50 ~ Cluster_4, data = ICRA)
+  leveneTest(ED50 ~ Cluster_4, data = AGLO)
+  leveneTest(ED50 ~ Cluster_4, data = AABR)
+  #leveneTest(ED50 ~ Cluster_4, data = AHYA) #needs 2 or more levels
+
+#Run T test
+  t.test(formula = ED50 ~ Cluster_4, data=ICRA, var.equal = TRUE )
+  # p-value = 0.03398
+
+  t.test(formula = ED50 ~ Cluster_4, data=AGLO, var.equal = TRUE )
+  #p-value = 0.8928
+  
+    t.test(formula = ED50 ~ Cluster_4, data=AABR, var.equal = TRUE )
+    #p-value = 0.06691
+  
+```
+
