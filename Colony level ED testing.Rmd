@@ -134,6 +134,13 @@ ggplot(plot_df,
   geom_smooth(method = "lm", se = FALSE) +
     facet_grid(ED_level ~ Predictor, scales = "free") 
 
+#by spp
+ AGLO %>%
+     ggplot(aes(x = Partial_mortality, y = ED_value, color = Species)) +
+     geom_point(size = 2, alpha = 0.7, color = "green") +
+     geom_smooth(method = "lm", se = TRUE) +
+     facet_wrap(~ED_level, scales = "free_y") +
+     theme_bw()
 ```
 ```{r}
 dat_wide <- ED_long %>%
@@ -212,7 +219,44 @@ ggplot(plot_aglo,
 #remember, Site effects are confounded with experimental runs and are therefore interpreted as block effects!!
 #starting with grouped ED_values
 
-#Q: Do colony traits affect ED, and do those effects differ among species? By using the split(ED_long, ED_long$ED_level), can test effect of each ED level.
+#Q: Do colony traits affect ED, and do those effects differ among species? 
+m1<-lmer(
+    ED50 ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site), data = cbass_dataset)
+
+m2<- lmer(
+    ED50 ~ Species * (Colony_depth_ft + Partial_mortality + Size_cm) + (1 | Site), data = cbass_dataset)
+
+anova(m1, m2) 
+#M1 has lower AIC
+summary(m1)
+emmeans(m1, ~ Species)
+emmeans(m1, pairwise ~ Species)
+```
+```{r}
+#just aglo icra
+m1<- lmer(
+  ED50 ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1|Site),
+  data = subset(cbass_dataset, Species %in% c("ICRA", "AGLO"))
+)
+m2<-lmer(
+  ED50 ~ Species *( Colony_depth_ft + Partial_mortality + Size_cm ) + (1|Site),
+  data = subset(cbass_dataset, Species %in% c("ICRA", "AGLO"))
+)
+
+
+anova(m1, m2)
+
+summary(m1)
+
+#spp level emmeans
+emmeans(m1, ~ Species)
+emmeans(m1, pairwise ~ Species)
+```
+
+
+```{r}
+#if you want to look at atll of the ed vals!
+#By using the split(ED_long, ED_long$ED_level), can test effect of each ED level.
 models_main <- lapply(split(ED_long, ED_long$ED_level), function(df) {
   lmer(
     ED_value ~ Species + Colony_depth_ft + Partial_mortality + Size_cm + (1 | Site),

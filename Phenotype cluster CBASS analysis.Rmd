@@ -65,6 +65,14 @@ ED_long %>%
     y = "ED50",
     title = "ED50 variation among phenotype clusters within species"
   )
+
+ggplot(df_clean, aes(x = Cluster_4, y = ED50, color = Cluster_4, fill = Cluster_4)) +
+  geom_jitter(alpha = 0.3, width = 0.15) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
+  facet_wrap("Species")+
+   scale_color_viridis_d(option = "C") 
+
 ```
 
 
