@@ -108,23 +108,6 @@ ggplot(ICRA, aes(Size_cm, Partial_mortality)) +
 dev.off()
 
 #just ed50 
-ggplot(ICRA_wide, aes(Colony_depth_ft, ED50)) +
- geom_point() +
- geom_smooth(method="lm") +
- theme_bw()
-
-ggplot(ICRA_wide, aes(Partial_mortality, ED50)) +
- geom_point() +
- geom_smooth(method="lm") +
- theme_bw()
-
-
-ggplot(ICRA_wide, aes(Size_cm, ED50)) +
- geom_point() +
- geom_smooth(method="lm") +
- theme_bw()
-
-
 lm(ED50 ~ Partial_mortality + Size_cm + Colony_depth_ft + Site, data = ICRA_wide)
 
 m1<-lmer(ED50 ~ Partial_mortality + Size_cm + Colony_depth_ft +  (1 | Site), data = ICRA_wide)
