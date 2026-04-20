@@ -74,7 +74,7 @@ df_clean$Cluster_7 <- as.factor(df_clean$Cluster_7)
 df_clean$Cluster_8 <- as.factor(df_clean$Cluster_8)
 
 #basic lm
-#change ED level but since all are collinear, feel ok about just analyzing ED50 here.
+#change ED level but since all EDs/DW are collinear, feel ok about just analyzing ED50 here.
 ED <- df_clean$ED50
 m4 <- lm(ED ~ Species + Cluster_4, data=df_clean)
 m5 <- lm(ED ~ Species + Cluster_5, data=df_clean)
@@ -101,7 +101,7 @@ AIC(m4,m5,m6, m7, m8)
 #model 4 is lowest for ED50, model 5 is lowest for ED5, ED95, and DW
 
 #lmer
-#Adding in site and interaction of spp
+#Adding interaction of site and spp
 ED <- df_clean$ED50
 m4i <- lmer(ED ~ Species * Cluster_4 + (1|Site), data=df_clean)
 m5i <- lmer(ED ~ Species * Cluster_5 + (1|Site), data=df_clean)

@@ -136,12 +136,11 @@ ggplot(plot_df,
 
 ```
 ```{r}
-#test collinearity 
- #make a correlation matrix
 dat_wide <- ED_long %>%
   select(GroupingProperty, Size_cm, Partial_mortality,
          Colony_depth_ft, ED_level, ED_value) %>%
-  pivot_wider(names_from = ED_level, values_from = ED_value)
+  pivot_wider(names_from = ED_level, values_from = ED_value)%>%
+  na.omit()
 
 vars <- dat_wide %>%
   select(Size_cm,
@@ -159,8 +158,8 @@ res1 <- rcorr(as.matrix(vars), type = "pearson")
 corrplot(
   res1$r,
   p.mat = res1$P,
-  sig.level = 0.05,
-  insig = "p-value",
+  #sig.level = 0.05,
+  #insig = "p-value",
   order = "hclust",
   addrect = 2,
   tl.srt = 45,
@@ -171,18 +170,7 @@ corrplot(
   addCoef.col = "black"
 )
 
- res1 <- rcorr(as.matrix(vars), type = "pearson")
- 
- corrplot(cor_mat,    p.mat = res1$P,
-         sig.level = 0.05, 
-        sig = "p-value",
-         order = 'hclust', 
-         addrect = 2, 
-         tl.srt = 45, 
-         tl.cex = 0.6,  
-         pch.cex = 0.8, 
-         type = 'upper')
-dev.off()
+
 ```
 
 ```{r}
