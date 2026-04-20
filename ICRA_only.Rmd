@@ -122,7 +122,7 @@ anova (m1, m2, m3, m4) #m3 has lowest AIC
 
 summary(m3)
 
-#  all vars here are continuous!
+#  all vars here are continuous! No categorical fixed effect (i.e. Species)
 
 emm<- emmeans(m1, Partial_mortality + Size_cm +  | Species)
 emmeans()
