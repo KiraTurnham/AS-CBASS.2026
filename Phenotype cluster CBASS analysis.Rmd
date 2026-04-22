@@ -47,7 +47,12 @@ AGLO<- df_clean %>% filter(Species == "AGLO")
 AABR<- df_clean %>% filter(Species == "AABR")
 AHYA<- df_clean %>% filter(Species == "AHYA")
 
-
+#make sure cluster is factor not numeric
+df_clean$Cluster_4 <- as.factor(df_clean$Cluster_4)
+df_clean$Cluster_5 <- as.factor(df_clean$Cluster_5)
+df_clean$Cluster_6 <- as.factor(df_clean$Cluster_6)
+df_clean$Cluster_7 <- as.factor(df_clean$Cluster_7)
+df_clean$Cluster_8 <- as.factor(df_clean$Cluster_8)
 ```
 
 ```{r}
@@ -71,20 +76,13 @@ ggplot(df_clean, aes(x = Cluster_4, y = ED50, color = Cluster_4, fill = Cluster_
   stat_summary(fun = mean, geom = "point", size = 3) +
   stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) +
   facet_wrap("Species")+
-   scale_color_viridis_d(option = "C") 
+   scale_color_viridis_d(option = "H") 
 
 ```
 
 
 ```{r}
 #look for cluster with lowest AIC in model
-
-#make sure cluster is factor not numeric
-df_clean$Cluster_4 <- as.factor(df_clean$Cluster_4)
-df_clean$Cluster_5 <- as.factor(df_clean$Cluster_5)
-df_clean$Cluster_6 <- as.factor(df_clean$Cluster_6)
-df_clean$Cluster_7 <- as.factor(df_clean$Cluster_7)
-df_clean$Cluster_8 <- as.factor(df_clean$Cluster_8)
 
 #Here analyzing cluster as within-species explanatory trait, not across spp.
 
@@ -101,25 +99,37 @@ anova(m1, m2)
 #m1 has lower AIC
 
 summary(m1)
+```
 
-#then run model for each individual spp. Played with putting in all predictors and cluster, but didnt make much difference.
-m_icra<-lmer(ED50 ~ Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=ICRA)
 
-m_aglo<-lmer(ED50 ~ Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=AGLO)
+```{r}
+# run model for each individual spp. Played with putting in all predictors and cluster, but didnt make much difference.
+m_icra<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=ICRA)
+m_icra1<-lmer(ED50 ~ Cluster_5 + (1|Site), data=ICRA)
 
-m_aabr<-lmer(ED50 ~ Cluster_4 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=AABR)
+m_aglo<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=AGLO)
+m_aglo1<-lmer(ED50 ~ Cluster_5 + (1|Site), data=AGLO)
+
+m_aabr<-lmer(ED50 ~ Cluster_5 + Colony_depth_ft + Partial_mortality + Size_cm+ (1|Site), data=AABR)
+m_aabr1<-lmer(ED50 ~ Cluster_5 + (1|Site), data=AABR)
 
 summary(m_icra)
+summary(m_icra1)
 #summary(m_ahya)
 summary(m_aglo)
+summary(m_aglo1)
 summary(m_aabr)
+summary(m_aabr1)
 
 #ahya only one group for Cluster_4
 
+anova(m_icra, m_icra1) #1 is lower AIC
+anova(m_aglo, m_aglo1) #1 is lower AIC
+anova(m_aabr, m_aabr1) #1 is lower AIC
 
-emmeans(m_aabr, pairwise ~ Cluster_4)
-emmeans(m_icra, pairwise ~ Cluster_4)
-emmeans(m_aglo, pairwise ~ Cluster_4)
+emmeans(m_aabr1, pairwise ~ Cluster_5)
+emmeans(m_icra1, pairwise ~ Cluster_5)
+emmeans(m_aglo1, pairwise ~ Cluster_5)
 #emmeans(m_ahya, pairwise ~ Cluster_5)
 ```
 ```{r}
